@@ -21,7 +21,6 @@ suite('p5xr', function() {
   suite('init()', function() {
     test('p5xr.isVR is true for VR sketch', function() {
       p5xr.instance = new p5vr();
-      p5xr.instance.init();
       assert.isTrue(p5xr.instance.isVR);
       p5xr.instance.remove();
     });
@@ -30,7 +29,6 @@ suite('p5xr', function() {
       sinon.spy(window, 'setup');
       window.preload = function() {
         p5xr.instance = new p5vr();
-        p5xr.instance.init();
       };
       myp5.remove();
       myp5 = new p5();
@@ -39,39 +37,35 @@ suite('p5xr', function() {
       p5xr.instance.remove();
     });
 
-    test('p5xr.removeLoadingElement() is called', function() {
+    test('p5xr.__removeLoadingElement() is called', function() {
+      sinon.spy(p5vr.prototype, '__removeLoadingElement');
       p5xr.instance = new p5vr();
-      sinon.spy(p5xr.instance, 'removeLoadingElement');
-      p5xr.instance.init();
-      sinon.assert.called(p5xr.instance.removeLoadingElement);
-      p5xr.instance.removeLoadingElement.restore();
+      sinon.assert.called(p5vr.prototype.__removeLoadingElement);
+      p5vr.prototype.__removeLoadingElement.restore();
       p5xr.instance.remove();
     });
 
     test('xrButton is set and added in DOM', function() {
       p5xr.instance = new p5vr();
-      p5xr.instance.init();
       assert.instanceOf(p5xr.instance.xrButton, p5xrButton);
       let button = document.querySelector('header button');
       assert.equal(button.tagName, 'BUTTON');
       p5xr.instance.remove();
     });
 
-    test('p5xr.sessionCheck() is called', function() {
+    test('p5xr.__sessionCheck() is called', function() {
+      sinon.spy(p5vr.prototype, '__sessionCheck');
       p5xr.instance = new p5vr();
-      sinon.spy(p5xr.instance, 'sessionCheck');
-      p5xr.instance.init();
-      sinon.assert.called(p5xr.instance.sessionCheck);
-      p5xr.instance.sessionCheck.restore();
+      sinon.assert.called(p5vr.prototype.__sessionCheck);
+      p5vr.prototype.__sessionCheck.restore();
       p5xr.instance.remove();
     });
   });
 
-  suite('removeLoadingElement()', function() {
+  suite('__removeLoadingElement()', function() {
     test('removes p5 loading element from DOM', function() {
       window.preload = function() {
         p5xr.instance = new p5vr();
-        p5xr.instance.init();
         let loading = document.getElementById(window._loadingScreenId);
         assert.isNull(loading);
       };

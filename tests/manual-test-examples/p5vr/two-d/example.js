@@ -15,14 +15,13 @@ function setup() {
   col = color(255);
   pg = createGraphics(400, 400);
   vel = createVector(speed, speed);
-  pos = createVector(width/2, height/2);
+  pos = createVector(100, 200);
   textureMode(NORMAL);
 }
 
 function calculate() {
   pos.x += vel.x;
   pos.y += vel.y;
-
   testBounds();
 }
 
@@ -32,7 +31,7 @@ function draw() {
   pg.ellipse(pg.width/2, pg.height/2, 100);
   pg.fill(255);
   pg.ellipse(pos.x, pos.y, 20);
-  translate(0, 0, 10);
+  translate(0, 0, -10);
   noStroke();
   texture(pg);
   rotateY(frameCount * 0.02);

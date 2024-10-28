@@ -13,29 +13,24 @@ function setup() {
 
 function calculate() {
   checkSync();
-  checkSetup();
   counter++;
 }
 
 function draw() {
   fill(0, 255, 0);
-  translate(0, 0, 10);
+  translate(0, 0, -10);
   rotateX(10);
   rotateY(20);
   strokeWeight(5);
   box(5);
+  
 }
 
-function checkSetup() {
-  if(setupCounter !== 2) {
-    console.error('setup() running incorrectly');
-  }
-}
 
 function checkSync() {
   if(counter === 0) {return;}
 
   if(counter !== frameCount) {
-    console.error('Out of sync!');
+    console.error(`draw timing out of sync:\nframeCount: ${frameCount}\ncalculate() run times: ${counter}`);
   }
 }

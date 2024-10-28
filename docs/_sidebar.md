@@ -2,17 +2,16 @@
 - __GENERAL__
   - [General Info](README.md)
   - [Community](general/community.md)
-  - [Why?](general/why.md)
+
 ***
 - __QUICK START__
-  - [Device and Browser Support](quick-start/device-support.md)
+  - [Device and Browser Support](device-support.html)
+  - [Immersive Web Emulator](quick-start/emulator.md)
+  - [Tips](quick-start/tips.md)
   - [Examples](quick-start/examples.md)
 ***
 - __REFERENCE__
-  - [VR](reference/vr.md)
-  <!-- - [AR](reference/ar.md) -->
-  - [Raycasting](reference/raycasting.md)
-  - [Utilities](reference/utilities.md)
+  - [Reference](reference/app.md)
 ***
 - __CONTRIBUTING__
     - [How To Help](contributing/contributing.md)

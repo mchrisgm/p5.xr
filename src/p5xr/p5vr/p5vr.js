@@ -4,17 +4,17 @@ import p5xr from '../core/p5xr';
 /**
  * p5vr class holds all state and methods that are specific to VR
  * @class
- *
+ * @private
  * @constructor
- *
+ * @ignore
  */
 
 export default class p5vr extends p5xr {
   constructor() {
     super();
+    this.mode = 'immersive-vr';
+    this.displayMode = 'VR';
     this.isVR = true;
-    this.isImmersive = true;
-
     this.lookYaw = 0;
     this.lookPitch = 0;
     this.LOOK_SPEED = 0.0025;
@@ -23,10 +23,10 @@ export default class p5vr extends p5xr {
     this.primaryTouch = undefined;
     this.prevTouchX = undefined;
     this.prevTouchY = undefined;
-  }
-
-  initVR() {
-    this.init();
+    if (navigator?.xr) {
+      navigator.xr.requestSession('inline').then(this.__startSketch.bind(this));
+    }
+    this.__createButton();
   }
 
   /**
@@ -35,84 +35,33 @@ export default class p5vr extends p5xr {
    * The current XRSession also gets a frame of reference and
    * base rendering layer. <br>
    * @param {XRSession}
+   * @private
+   * @ignore
    */
-  startSketch(session) {
-    this.xrSession = this.xrButton.session = session;
-    this.canvas = p5.instance.canvas;
-    this.canvas.style.visibility = 'visible';
-
-    this.xrSession.addEventListener('end', this.onSessionEnded.bind(this));
-    if (typeof window.setup === 'function') {
-      window.setup();
-    }
-    this.onRequestSession();
-  }
-
-  /**
-   * `device.requestSession()` must be called within a user gesture event.
-   * @param {XRDevice}
-   */
-  onXRButtonClicked() {
-    if (this.isImmersive) {
-      console.log('requesting session with mode: immersive-vr');
-      navigator.xr.requestSession('immersive-vr').then(this.startSketch.bind(this));
-    } else {
-      console.log('requesting session with mode: non-immersive-vr');
-      this.xrButton.hide();
-      // Start up an inline session, which should always be supported on
-      // browsers that support WebXR regardless of the available hardware.
-      navigator.xr.requestSession('inline').then(this.startSketch.bind(this));
-    }
-  }
-
-  onRequestSession() {
-    this.xrButton.setTitle(this.isVR ? 'EXIT VR' : 'EXIT AR');
-    p5.instance._renderer._curCamera.cameraType = 'custom';
-    this.gl = this.canvas.getContext('webgl', {
-      xrCompatible: true,
-    });
-
-    // Use the p5's WebGL context to create a XRWebGLLayer and set it as the
-    // sessions baseLayer. This allows any content rendered to the layer to
-    // be displayed on the XRDevice;
-    this.xrSession.updateRenderState({ baseLayer: new XRWebGLLayer(this.xrSession, this.gl) });
-
-    // Get a frame of reference, which is required for querying poses.
-    // 'local' places the initial pose relative to initial location of viewer
-    // 'viewer' is only for inline experiences and only allows rotation
-    const refSpaceRequest = this.isImmersive ? 'local' : 'viewer';
-    this.xrSession.requestReferenceSpace(refSpaceRequest)
-      .then((refSpace) => {
-        this.xrRefSpace = refSpace;
-        // Inform the session that we're ready to begin drawing.
-        this.xrSession.requestAnimationFrame(this.onXRFrame.bind(this));
-
-        if (!this.isImmersive) {
-          this.xrSession.updateRenderState({
-            inlineVerticalFieldOfView: 90 * (Math.PI / 180),
-          });
-          this.addInlineViewListeners(this.canvas);
-        }
-      });
+  __startSketch(session) {
+    super.__startSketch(session);
   }
 
   /**
    * clears the background based on the current clear color (`curClearColor`)
+   * @private
+   * @ignore
    */
-  _clearVR() {
+  clearVR() {
     if (this.curClearColor === null) {
       return;
     }
     p5.instance.background(this.curClearColor);
 
-    // Inline sessions need to clear the depth buffer bit
-    if (!this.isImmersive) {
-      this.gl.clear(this.gl.DEPTH_BUFFER_BIT);
-    }
+    this.gl.clear(this.gl.DEPTH_BUFFER_BIT);
   }
 
-  // XRReferenceSpace offset is immutable, so return a new reference space
-  // that has an updated orientation.
+  /**
+   * Returns a new reference space modified by the inline session's viewer pose.
+   * @param {XRReferenceSpace} refSpace Reference space adjusted for user's current pose
+   * @returns {XRReferenceSpace} Referennce space adjusted by inline view's current pose   * @private
+   * @ignore
+   */
   getAdjustedRefSpace(refSpace) {
     // Represent the rotational component of the reference space as a
     // quaternion.
@@ -123,13 +72,23 @@ export default class p5vr extends p5xr {
     const xform = new XRRigidTransform(
       { x: 0, y: 0, z: 0 },
       {
-        x: invOrientation[0], y: invOrientation[1], z: invOrientation[2], w: invOrientation[3],
+        x: invOrientation[0],
+        y: invOrientation[1],
+        z: invOrientation[2],
+        w: invOrientation[3],
       },
     );
     return refSpace.getOffsetReferenceSpace(xform);
   }
 
-  rotateView(dx, dy) {
+  /**
+   * Modifies the view of an inline session, called by mouse events.
+   * @param {Number} dx view yaw change in radians
+   * @param {Numbers} dy view pitch change in radians
+   * @private
+   * @ignore
+   */
+  rotateInlineView(dx, dy) {
     this.lookYaw += dx * this.LOOK_SPEED;
     this.lookPitch += dy * this.LOOK_SPEED;
     if (this.lookPitch < -Math.PI * 0.5) this.lookPitch = -Math.PI * 0.5;
@@ -138,11 +97,17 @@ export default class p5vr extends p5xr {
 
   // Make the canvas listen for mouse and touch events so that we can
   // adjust the viewer pose accordingly in inline sessions.
-  addInlineViewListeners(canvas) {
+  /**
+   * Adds event listeners to the canvas to allow for user interaction with the canvas during
+   * inline sessions.
+   * @private
+   * @ignore
+   */
+  addInlineViewListeners() {
     this.canvas.addEventListener('mousemove', (event) => {
       // Only rotate when the right button is pressed
       if (event.buttons && 2) {
-        this.rotateView(event.movementX, event.movementY);
+        this.rotateInlineView(event.movementX, event.movementY);
       }
     });
 
@@ -160,11 +125,14 @@ export default class p5vr extends p5xr {
     // Update the set of active touches now that one or more touches
     // finished. If the primary touch just finished, update the viewer pose
     // based on the final touch movement.
-    canvas.addEventListener('touchend', (event) => {
+    this.canvas.addEventListener('touchend', (event) => {
       for (const touch of event.changedTouches) {
         if (this.primaryTouch === touch.identifier) {
           this.primaryTouch = undefined;
-          this.rotateView(touch.pageX - this.prevTouchX, touch.pageY - this.prevTouchY);
+          this.rotateInlineView(
+            touch.pageX - this.prevTouchX,
+            touch.pageY - this.prevTouchY,
+          );
         }
       }
     });
@@ -172,7 +140,7 @@ export default class p5vr extends p5xr {
     // Update the set of active touches now that one or more touches was
     // cancelled. Don't update the viewer pose when the primary touch was
     // cancelled.
-    canvas.addEventListener('touchcancel', (event) => {
+    this.canvas.addEventListener('touchcancel', (event) => {
       for (const touch of event.changedTouches) {
         if (this.primaryTouch === touch.identifier) {
           this.primaryTouch = undefined;
@@ -182,10 +150,13 @@ export default class p5vr extends p5xr {
 
     // Only use the delta between the most recent and previous events for
     // the primary touch. Ignore the other touches.
-    canvas.addEventListener('touchmove', (event) => {
+    this.canvas.addEventListener('touchmove', (event) => {
       for (const touch of event.changedTouches) {
         if (this.primaryTouch === touch.identifier) {
-          this.rotateView(touch.pageX - this.prevTouchX, touch.pageY - this.prevTouchY);
+          this.rotateInlineView(
+            touch.pageX - this.prevTouchX,
+            touch.pageY - this.prevTouchY,
+          );
           this.prevTouchX = touch.pageX;
           this.prevTouchY = touch.pageY;
         }

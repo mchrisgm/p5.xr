@@ -3,8 +3,13 @@ import ARAnchor from './ARAnchor';
 
 export default class p5ar extends p5xr {
   constructor() {
-    super();
+    super({
+      requiredFeatures: ['local', 'hit-test'],
+    });
+    this.mode = 'immersive-ar';
+    this.displayMode = 'AR';
     this.canvas = null;
+    this.__createButton();
   }
 
   //* ********************************************************//
@@ -12,33 +17,44 @@ export default class p5ar extends p5xr {
   //* ********************************************************//
 
   /**
-     * This is where the actual p5 canvas is first created, and
-     * the GL rendering context is accessed by p5vr.
-     * The current XRSession also gets a frame of reference and
-     * base rendering layer. <br>
-     * @param {XRSession}
-     */
-  startSketch(session) {
-    this.xrSession = this.xrButton.session = session;
-    this.xrSession.addEventListener('end', this.onSessionEnded);
+   * This is where the actual p5 canvas is first created, and
+   * the GL rendering context is accessed by p5vr.
+   * The current XRSession also gets a frame of reference and
+   * base rendering layer. <br>
+   * @param {XRSession}
+   * @private
+   * @ignore
+   */
+  __startSketch(session) {
+    super.__startSketch(session);
+
     if (typeof touchStarted === 'function') {
       this.xrSession.addEventListener('select', touchStarted);
     }
-    this.canvas = p5.instance.canvas;
-    p5.instance._renderer._curCamera.cameraType = 'custom';
-    this.onRequestSession();
-    p5.instance._decrementPreload();
   }
 
-  onSelect(event) {
+  /**
+   *
+   * @param {InputEvent} ev
+   * @private
+   * @ignore
+   */
+  __onSelect(ev) {
     const context = window;
     const userMousePressed = context.mousePressed;
     if (typeof userMousePressed === 'function') {
-      userMousePressed();
+      userMousePressed(ev);
     }
   }
 
-  detectHit(ev) {
+  /**
+   *
+   * @param {InputEvent} ev
+   * @returns {p5.Vector}
+   * @private
+   * @ignore
+   */
+  __detectHit(ev) {
     if (ev === null || typeof ev === 'undefined') {
       console.warn('You must pass the touchStarted event to detectHit.');
       return null;
@@ -48,70 +64,31 @@ export default class p5ar extends p5xr {
       return null;
     }
 
-    const y = ev.clientY / window.innerHeight;
-    const x = ev.clientX / window.innerWidth;
     if (this.xrHitTestSource && this.viewer.pose && this.frame) {
       const hitTestResults = this.frame.getHitTestResults(this.xrHitTestSource);
       if (hitTestResults.length > 0) {
         // const pose = hitTestResults[0].getPose(ev.inputSource.targetRaySpace, this.xrRefSpace);
         const pose = hitTestResults[0].getPose(this.xrRefSpace);
-        return createVector(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
+        return createVector(
+          pose.transform.position.x,
+          pose.transform.position.y,
+          pose.transform.position.z,
+        );
       }
     }
   }
 
-  createAnchor(vec) {
+  /**
+   *
+   * @param {p5.Vector} vec Vector3
+   * @returns ARAnchor
+   * @private
+   * @ignore
+   */
+  __createAnchor(vec) {
     if (vec === null || typeof vec === 'undefined') {
       return null;
     }
     return new ARAnchor(vec.x, vec.y, vec.z);
-  }
-
-  /**
-   * `device.requestSession()` must be called within a user gesture event.
-   * @param {XRDevice}
-   */
-  onXRButtonClicked(device) {
-    if (window.injectedPolyfill) {
-      console.log('ARCORE mode is not supported with a polyfill. Try using a more recent browser version');
-      return;
-    }
-    // Normalize the various vendor prefixed versions of getUserMedia.
-    navigator.getUserMedia = (navigator.getUserMedia
-        || navigator.webkitGetUserMedia
-        || navigator.mozGetUserMedia
-        || navigator.msGetUserMedia);
-
-    navigator.xr.requestSession('immersive-ar', {
-      requiredFeatures: ['local', 'hit-test'],
-    })
-      .then((session) => {
-        this.startSketch(session);
-      }, (error) => {
-        console.log(`${error} unable to request an immersive-ar session.`);
-      });
-  }
-
-  onRequestSession() {
-    this.gl = this.canvas.getContext('webgl', {
-      xrCompatible: true,
-    });
-    this.gl.makeXRCompatible().then(() => {
-      this.xrSession.updateRenderState({ baseLayer: new XRWebGLLayer(this.xrSession, this.gl) });
-    });
-
-    this.xrSession.requestReferenceSpace('viewer').then((refSpace) => {
-      this.xrViewerSpace = refSpace;
-      this.xrSession.requestHitTestSource({ space: this.xrViewerSpace }).then((hitTestSource) => {
-        this.xrHitTestSource = hitTestSource;
-      });
-    });
-
-    this.xrSession.requestReferenceSpace('local')
-      .then((refSpace) => {
-        this.xrRefSpace = refSpace;
-        // Inform the session that we're ready to begin drawing.
-        this.xrSession.requestAnimationFrame(this.onXRFrame.bind(this));
-      });
   }
 }

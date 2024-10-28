@@ -1,38 +1,20 @@
-// This is primarily adopted from webxr-button.js
-// copying the original license here
-// TODO :: custom solution for buttons
-//
-//
-//
-// Copyright 2016 Google Inc.
-//
-//     Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-//     You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-//     Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-//     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//     See the License for the specific language governing permissions and
-// limitations under the License.
-
-// This is a stripped down and specialized version of WebVR-UI
-// (https://github.com/googlevr/webvr-ui) that takes out most of the state
-// management in favor of providing a simple way of listing available devices
-// for the needs of the sample pages. Functionality like beginning sessions
-// is intentionally left out so that the sample pages can demonstrate them more
-// clearly.
-
-export default class p5xrButton {
+/**
+ * @class p5xrButton
+ * A button that handles entering and exiting an XR session.
+ * All browsers require that the user grant permission to enter XR and permission
+ * can only be request with a user gesture.
+ * @category Initialization
+ */
+class p5xrButton {
   constructor(options) {
     this.options = options || {};
 
     this.options.color = options.color || 'rgb(237, 34, 93)';
-    this.options.background = options.background || false;
+    this.options.background = options.background || 'white';
+    this.options.opacity = options.opacity || 0.95;
     this.options.disabledOpacity = options.disabledOpacity || 0.5;
     this.options.height = options.height || window.innerWidth / 5;
+    this.options.fontSize = options.fontSize || this.options.height / 3;
     this.options.corners = options.corners || 'square';
     this.options.cssprefix = options.cssprefix || 'webvr-ui';
 
@@ -40,8 +22,8 @@ export default class p5xrButton {
     this.options.textXRNotFoundTitle = options.textXRNotFoundTitle || 'XR NOT FOUND';
     this.options.textExitXRTitle = options.textExitXRTitle || 'EXIT XR';
 
-    this.options.onRequestSession = options.onRequestSession || (function () {});
-    this.options.onEndSession = options.onEndSession || (function () {});
+    this.options.onRequestSession = options.onRequestSession || function () {};
+    this.options.onEndSession = options.onEndSession || function () {};
 
     this.options.injectCSS = options.injectCSS !== false;
 
@@ -52,22 +34,29 @@ export default class p5xrButton {
     this.logoScale = 1.2;
     this._WEBXR_UI_CSS_INJECTED = {};
 
-    // Pass in your own domElement if you really dont want to use ours
-    this.domElement = options.domElement || this.createDefaultView(options);
+    this.domElement = options.domElement || this.__createDefaultView(options);
     this.__defaultDisplayStyle = this.domElement.style.display || 'initial';
 
     // Bind button click events to __onClick
-    this.domElement.addEventListener('click', () => this.__onXRButtonClick());
-
+    this.domElement.addEventListener('click', () => this.__onXRButtonClicked());
+    this._enabled = false;
     this.__forceDisabled = false;
     this.__setDisabledAttribute(true);
     this.setTitle(this.options.textXRNotFoundTitle);
   }
 
-  generateInnerHTML(cssPrefix, height) {
+  /**
+   * Generate inner HTML for the button
+   * @param {String} cssPrefix string to prefix to the css classes
+   * @param {Number} height height of the button
+   * @returns {String} innerHTML for the button
+   * @private
+   * @ignore
+   */
+  __generateInnerHTML(cssPrefix, height) {
     const logoHeight = height * this.logoScale;
-    const svgString = this.generateXRIconString(cssPrefix, logoHeight)
-      + this.generateNoXRIconString(cssPrefix, logoHeight);
+    const svgString = this.__generateXRIconString(cssPrefix, logoHeight)
+      + this.__generateNoXRIconString(cssPrefix, logoHeight);
 
     return `<button class="${cssPrefix}-button">
     <div class="${cssPrefix}-title"></div>
@@ -75,38 +64,72 @@ export default class p5xrButton {
     </button>`;
   }
 
-  createDefaultView(options) {
-    const fontSize = options.height / 3;
-
+  /**
+   * Create the default view for the button.
+   * @param {Object}} options options for the button
+   * @returns HTMLElement the button element
+   * @private
+   * @ignore
+   */
+  __createDefaultView(options) {
     if (options.injectCSS) {
       // Check that css isnt already injected
       if (!this._WEBXR_UI_CSS_INJECTED[options.cssprefix]) {
-        this.injectCSS(this.generateCSS(options, fontSize));
+        this.__injectCSS(this.__generateCSS(options));
         this._WEBXR_UI_CSS_INJECTED[options.cssprefix] = true;
       }
     }
 
     const el = document.createElement('div');
-    el.innerHTML = this.generateInnerHTML(options.cssprefix, fontSize);
+    el.innerHTML = this.__generateInnerHTML(
+      options.cssprefix,
+      options.fontSize,
+    );
     return el.firstChild;
   }
 
-  createXRIcon(cssPrefix, height) {
+  /**
+   * Create the icon element for the XR available state for button.
+   * @param {String} cssPrefix string to prefix to the css classes
+   * @param {Number} height height of the button
+   * @returns HTMLElement the icon element
+   * @private
+   * @ignore
+   */
+  __createXRIcon(cssPrefix, height) {
     const el = document.createElement('div');
     el.innerHTML = generateXRIconString(cssPrefix, height);
     return el.firstChild;
   }
 
-  createNoXRIcon(cssPrefix, height) {
+  /**
+   * Create the icon element for the XR not available state for button.
+   * @param {String} cssPrefix string to prefix to the css classes
+   * @param {Number} height height of the button
+   * @returns HTMLElement the icon element
+   * @private
+   * @ignore
+   */
+  __createNoXRIcon(cssPrefix, height) {
     const el = document.createElement('div');
     el.innerHTML = generateNoXRIconString(cssPrefix, height);
     return el.firstChild;
   }
 
-  generateXRIconString(cssPrefix, height) {
+  /**
+   * Generate the SVG string for the XR available state for button.
+   * @param {String} cssPrefix string to prefix to the css classes
+   * @param {Number} height height of the button
+   * @returns {String} the svg string for the XR icon
+   * @private
+   * @ignore
+   */
+  __generateXRIconString(cssPrefix, height) {
     const aspect = 28 / 18;
     return `<svg class="${cssPrefix}-svg" version="1.1" x="0px" y="0px"
-        width="${aspect * height}px" height="${height}px" viewBox="0 0 28 18" xml:space="preserve">
+        width="${
+  aspect * height
+}px" height="${height}px" viewBox="0 0 28 18" xml:space="preserve">
         <path d="M26.8,1.1C26.1,0.4,25.1,0,24.2,0H3.4c-1,0-1.7,0.4-2.4,1.1C0.3,1.7,0,2.7,0,3.6v10.7
         c0,1,0.3,1.9,0.9,2.6C1.6,17.6,2.4,18,3.4,18h5c0.7,0,1.3-0.2,1.8-0.5c0.6-0.3,1-0.8,1.3-1.4l
         1.5-2.6C13.2,13.1,13,13,14,13v0h-0.2 h0c0.3,0,0.7,0.1,0.8,0.5l1.4,2.6c0.3,0.6,0.8,1.1,1.3,
@@ -117,10 +140,20 @@ export default class p5xrButton {
     </svg>`;
   }
 
-  generateNoXRIconString(cssPrefix, height) {
+  /**
+   * Generate the SVG string for the XR not available state for button.
+   * @param {String} cssPrefix string to prefix to the css classes
+   * @param {Number} height height of the button
+   * @returns {String} the svg string for the XR icon
+   * @private
+   * @ignore
+   */
+  __generateNoXRIconString(cssPrefix, height) {
     const aspect = 28 / 18;
     return `<svg class="${cssPrefix}-svg-error" x="0px" y="0px"
-        width="${aspect * height}px" height="${aspect * height}px" viewBox="0 0 28 28" xml:space="preserve">
+        width="${aspect * height}px" height="${
+  aspect * height
+}px" viewBox="0 0 28 28" xml:space="preserve">
         <path d="M17.6,13.4c0-0.2-0.1-0.4-0.1-0.6c0-1.6,1.3-2.8,2.8-2.8s2.8,1.3,2.8,2.8s-1.3,2.8-2.8,2.8
         c-0.2,0-0.4,0-0.6-0.1l5.9,5.9c0.5-0.2,0.9-0.4,1.3-0.8
         c0.7-0.7,1.1-1.6,1.1-2.5V7.4c0-1-0.4-1.9-1.1-2.5c-0.7-0.7-1.6-1-2.5-1
@@ -134,22 +167,21 @@ export default class p5xrButton {
   }
 
   /**
-   * Sets the XRDevice this button is associated with.
+   * Sets the XRDevice this button is associated with. This rarely needs to be called directly.
    * @param {XRDevice} device
-   * @return {EnterXRButton}
+   * @return {p5xrButton}
    */
   setDevice(device) {
     this.device = device;
-    this.__updateButtonState();
     return this;
   }
 
   /**
- * Indicate that there's an active XRSession. Switches the button to "Exit XR"
- * state if not null, or "Enter XR" state if null.
- * @param {XRSession} session
- * @return {EnterXRButton}
- */
+   * Indicates to the p5xrButton that there's an active XRSession.
+   * Switches the button to it's exitXR state if session is not null.
+   * @param {XRSession} session The active XRSession associated with the button
+   * @return {p5xrButton}
+   */
   setSession(session) {
     this.session = session;
     this.__updateButtonState();
@@ -157,10 +189,30 @@ export default class p5xrButton {
   }
 
   /**
- * Set the title of the button
- * @param {string} text
- * @return {EnterXRButton}
- */
+   * Updates the display of the button based on it's current state
+   * @private
+   */
+  __updateButtonState() {
+    if (this.session) {
+      this.setTitle(this.options.textExitXRTitle);
+      this.setTooltip('Exit XR presentation');
+      this.__setDisabledAttribute(false);
+    } else if (this._enabled) {
+      this.setTitle(this.options.textEnterXRTitle);
+      this.setTooltip('Enter XR');
+      this.__setDisabledAttribute(false);
+    } else {
+      this.setTitle(this.options.textXRNotFoundTitle);
+      this.setTooltip('No XR headset found.');
+      this.__setDisabledAttribute(true);
+    }
+  }
+
+  /**
+   * Set the title of the p5xrButton
+   * @param {String} text The title for the button
+   * @return {p5xrButton}
+   */
   setTitle(text) {
     this.domElement.title = text;
     this.ifChild(this.domElement, this.options.cssprefix, 'title', (title) => {
@@ -176,28 +228,29 @@ export default class p5xrButton {
   }
 
   /**
- * Generate the CSS string to inject
- *
- * @param {Object} options
- * @param {Number} [fontSize=18]
- * @return {string}
- */
-  generateCSS(options, fontSize = 18) {
+   * Generates the CSS string to inject based on the options passed to the constructor.
+   *
+   * @param {Object} options
+   * @return {String}
+   * @private
+   * @ignore
+   */
+  __generateCSS(options) {
     const { height } = options;
     const borderWidth = 2;
     const borderColor = options.background ? options.background : options.color;
     const cssPrefix = options.cssprefix;
 
     let borderRadius;
-    if (options.corners == 'round') {
+    if (options.corners === 'round') {
       borderRadius = options.height / 2;
-    } else if (options.corners == 'square') {
+    } else if (options.corners === 'square') {
       borderRadius = 2;
     } else {
       borderRadius = options.corners;
     }
 
-    return (`
+    return `
       @font-face {
           font-family: 'Karla';
           font-style: normal;
@@ -223,9 +276,9 @@ export default class p5xrButton {
           border-radius: ${borderRadius}px;
           box-sizing: border-box;
           background: ${options.background ? options.background : 'none'};
-
+          opacity: ${options.opacity};
           height: ${height}px;
-          min-width: ${fontSize * 9.6}px;
+          min-width: ${options.fontSize * 9.6}px;
           display: inline-block;
           position: absolute;
           top: 5%;
@@ -252,13 +305,15 @@ export default class p5xrButton {
       }
       .${cssPrefix}-svg {
           fill: ${options.color};
-          margin-top: ${(height - fontSize * this.logoScale) / 2 - 2}px;
+          margin-top: ${(height - options.fontSize * this.logoScale) / 2 - 2}px;
           margin-left: ${height / 3}px;
       }
       .${cssPrefix}-svg-error {
           fill: ${options.color};
           display:none;
-          margin-top: ${(height - 28 / 18 * fontSize * this.logoScale) / 2 - 2}px;
+          margin-top: ${
+  (height - (28 / 18) * options.fontSize * this.logoScale) / 2 - 2
+}px;
           margin-left: ${height / 3}px;
       }
 
@@ -270,9 +325,11 @@ export default class p5xrButton {
       .${cssPrefix}-title {
           color: ${options.color};
           position: relative;
-          font-size: ${fontSize}px;
+          font-size: ${options.fontSize}px;
           padding-left: ${height * 1.05}px;
-          padding-right: ${(borderRadius - 10 < 5) ? height / 3 : borderRadius - 10}px;
+          padding-right: ${
+  borderRadius - 10 < 5 ? height / 3 : borderRadius - 10
+}px;
       }
 
       /*
@@ -290,10 +347,16 @@ export default class p5xrButton {
       button.${cssPrefix}-button[disabled=true] > .${cssPrefix}-logo > .${cssPrefix}-svg-error {
           display:initial;
       }
-    `);
+    `;
   }
 
-  injectCSS(cssText) {
+  /**
+   * Inject CSS string into the DOM.
+   * @param {String} cssText CSS string to inject
+   * @private
+   * @ignore
+   */
+  __injectCSS(cssText) {
     // Create the css
     const style = document.createElement('style');
     style.innerHTML = cssText;
@@ -302,62 +365,75 @@ export default class p5xrButton {
     head.insertBefore(style, head.firstChild);
   }
 
+  /**
+   * Runs a callback function on the child of the given element if it exists.
+   * @param {HTMLElement} el The element to check
+   * @param {String} cssPrefix The css prefix to check
+   * @param {String} suffix The suffix to check
+   * @param {Function} fn
+   * @private
+   * @ignore
+   */
   ifChild(el, cssPrefix, suffix, fn) {
     const c = el.querySelector(`.${cssPrefix}-${suffix}`);
-    c && fn(c);
+    if (c) {
+      fn(c);
+    }
   }
 
   /**
- * Set the tooltip of the button
- * @param {string} tooltip
- * @return {EnterXRButton}
- */
+   * Set the tooltip of the button
+   * @param {String} tooltip
+   * @return {p5xrButton}
+   */
   setTooltip(tooltip) {
     this.domElement.title = tooltip;
     return this;
   }
 
   /**
- * Show the button
- * @return {EnterXRButton}
- */
+   * Show the button
+   * @return {p5xrButton}
+   */
   show() {
     this.domElement.style.display = this.__defaultDisplayStyle;
     return this;
   }
 
   /**
- * Hide the button
- * @return {EnterXRButton}
- */
+   * Hide the button
+   * @return {p5xrButton}
+   */
   hide() {
     this.domElement.style.display = 'none';
     return this;
   }
 
   /**
- * Enable the button
- * @return {EnterXRButton}
- */
+   * Enable the button
+   * @return {p5xrButton}
+   */
   enable() {
+    this._enabled = true;
     this.__setDisabledAttribute(false);
     this.__forceDisabled = false;
     return this;
   }
 
   /**
- * Disable the button from being clicked
- * @return {EnterXRButton}
- */
+   * Disable the button from being clicked
+   * @return {p5xrButton}
+   */
   disable() {
+    this._enabled = false;
     this.__setDisabledAttribute(true);
     this.__forceDisabled = true;
     return this;
   }
 
   /**
- * clean up object for garbage collection
- */
+   * Remove the p5xrButton from the DOM
+   */
   remove() {
     if (this.domElement.parentElement) {
       this.domElement.parentElement.removeChild(this.domElement);
@@ -365,10 +441,35 @@ export default class p5xrButton {
   }
 
   /**
- * Set the disabled attribute
- * @param {boolean} disabled
- * @private
- */
+   * Set button state based on mode support
+   */
+  setAvailable(isAvailable, mode) {
+    const displayMode = mode.slice(-2).toUpperCase();
+    if (isAvailable) {
+      const msg = `Enter ${displayMode}`;
+      this.setTitle(msg);
+      this.setTooltip(msg);
+      this.enable();
+      console.log(`${mode} supported`);
+      this.setDevice(true);
+    } else if (displayMode === 'VR') {
+      console.log('VR not supported. Falling back to inline mode.');
+      this.hide();
+    } else {
+      const msg = `${displayMode} not supported`;
+      this.setTitle(msg);
+      this.setTooltip(msg);
+      this.disable();
+      console.log(`${mode} not supported`);
+    }
+  }
+
+  /**
+   * Set the disabled attribute
+   * @param {Boolean} disabled
+   * @private
+   * @ignore
+   */
   __setDisabledAttribute(disabled) {
     if (disabled || this.__forceDisabled) {
       this.domElement.setAttribute('disabled', 'true');
@@ -378,15 +479,19 @@ export default class p5xrButton {
   }
 
   /**
- * Handling click event from button
- * @private
- */
-  __onXRButtonClick() {
+   * Handling click event from button
+   * @private
+   * @ignore
+   */
+  __onXRButtonClicked() {
     if (this.session) {
       this.options.onEndSession(this.session);
     } else if (this.device) {
       // feature detect
-      if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      if (
+        typeof DeviceMotionEvent !== 'undefined'
+        && typeof DeviceMotionEvent.requestPermission === 'function'
+      ) {
         DeviceMotionEvent.requestPermission()
           .then((permissionState) => {
             if (permissionState === 'granted') {
@@ -396,9 +501,11 @@ export default class p5xrButton {
           .catch(console.error);
       }
 
-      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      if (
+        typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function'
+      ) {
         DeviceOrientationEvent.requestPermission()
-          .then(permissionState => {
+          .then((permissionState) => {
             if (permissionState === 'granted') {
               window.addEventListener('deviceorientation', () => {});
             }
@@ -409,24 +516,6 @@ export default class p5xrButton {
       this.options.onRequestSession(this.device);
     }
   }
-
-  /**
- * Updates the display of the button based on it's current state
- * @private
- */
-  __updateButtonState() {
-    if (this.session) {
-      this.setTitle(this.options.textExitXRTitle);
-      this.setTooltip('Exit XR presentation');
-      this.__setDisabledAttribute(false);
-    } else if (this.device) {
-      this.setTitle(this.options.textEnterXRTitle);
-      this.setTooltip('Enter XR');
-      this.__setDisabledAttribute(false);
-    } else {
-      this.setTitle(this.options.textXRNotFoundTitle);
-      this.setTooltip('No XR headset found.');
-      this.__setDisabledAttribute(true);
-    }
-  }
 }
+
+export default p5xrButton;
